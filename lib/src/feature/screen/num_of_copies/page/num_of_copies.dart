@@ -31,7 +31,7 @@ class _NumCopiesState extends State<NumCopies> {
   @override
   void initState() {
     super.initState();
-   // startTimer();
+    // startTimer();
     fetchCopies();
   }
 
@@ -202,8 +202,7 @@ class _NumCopiesState extends State<NumCopies> {
                       child: Column(
                         children: [
                           Container(
-                        
-                              width: 700,
+                            width: 700,
                             constraints: BoxConstraints(
                               minHeight:
                                   MediaQuery.of(context).size.height * 0.75,
@@ -248,20 +247,19 @@ class _NumCopiesState extends State<NumCopies> {
                                   ),
                                   const SizedBox(height: 40),
                                   Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Btn(
-          onTap: () { 
-          },
-          width: 150,
-          child: const Texts(
-            texts: 'Back',
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: AppColor.kAppColor,
-          ),
-        ),
-        const SizedBox(width: 25),
+                                        onTap: () {},
+                                        width: 150,
+                                        child: const Texts(
+                                          texts: 'Back',
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColor.kAppColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 25),
                                       AppBtn(
                                         onTap: () {
                                           if (selectedCopyId != null) {
@@ -301,7 +299,3 @@ class _NumCopiesState extends State<NumCopies> {
     );
   }
 }
-
-
-
-

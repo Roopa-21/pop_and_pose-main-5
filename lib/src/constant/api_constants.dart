@@ -47,6 +47,7 @@ class BaseurlForBackend {
   static const getFrames = "$baseUrL$framesEndpoint";
   static const selectFrame = "$baseUrL$selectFramesendPoint";
   static const uploadimage = "$baseUrL$uploadimagebase";
+  static const redisterDeviceApi = "$baseUrL$registerDevice";
 }
 
 class PaytmAPIConstants {

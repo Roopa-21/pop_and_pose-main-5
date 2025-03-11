@@ -9,7 +9,6 @@ import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_
 import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_state.dart';
 import 'package:pop_and_pose/src/feature/screen/choose_frame/page/choose_frame.dart';
 import 'package:pop_and_pose/src/feature/screen/choose_screen/page/choose_screen.dart';
-import 'package:pop_and_pose/src/feature/screen/num_of_copies/page/num_of_copies.dart';
 import 'package:pop_and_pose/src/feature/screen/register_device/page/register_device.dart';
 import 'package:pop_and_pose/src/feature/screen/settings/page/settings.dart';
 import 'package:pop_and_pose/src/feature/widgets/app_texts.dart';
@@ -46,6 +45,29 @@ class _SplashScreenPageState extends State<SplashScreenPage>
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<bool> checkDeviceExists() async {
+    const String apiUrl =
+        "https://pop-pose-backend.vercel.app/api/background/devices";
+    try {
+      final response = await http.get(Uri.parse(apiUrl));
+
+      if (response.statusCode == 200) {
+        List<dynamic> devices = jsonDecode(response.body);
+        String currentDeviceKey = "Hello device 15";
+
+        bool deviceExists =
+            devices.any((device) => device['device_key'] == currentDeviceKey);
+        return deviceExists;
+      } else {
+        debugPrint("Failed to fetch devices: ${response.statusCode}");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("Error fetching devices: $e");
+      return false;
+    }
   }
 
   Future<void> _submitWithoutUser() async {
@@ -278,7 +300,6 @@ class _SplashScreenPageState extends State<SplashScreenPage>
                             fit: BoxFit.contain,
                           ),
                         ),
-
                         const SizedBox(height: 60),
                         Container(
                           padding: const EdgeInsets.all(15),
@@ -335,12 +356,22 @@ class _SplashScreenPageState extends State<SplashScreenPage>
       );
     } else {
       return GestureDetector(
-        onTap: () {
-        context.read<CameraBloc>().add(DiscoverCameraEvent());
-          
-        //Get.offAll(() => const RegisterDevice());
-      
-      //  Get.offAll(() =>  const SettingsPage());
+        onTap:
+            //   context.read<CameraBloc>().add(DiscoverCameraEvent());
+            () {
+          //   bool exists = await checkDeviceExists();
+          //   if (exists) {
+          //     Get.offAll(() => const ChooseFrame(
+          //           userId: '',
+          //         ));
+          //   } else {
+          //     Get.offAll(() =>
+          //         const RegisterDevice());
+          //   }
+
+          //  Get.offAll(() => const RegisterDevice());
+
+          Get.offAll(() => const SettingsPage());
         },
         child: const Texts(
           texts: 'Touch the screen to START',

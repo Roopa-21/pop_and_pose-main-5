@@ -34,7 +34,7 @@ class _ChooseFrameState extends State<ChooseFrame> {
   @override
   void initState() {
     super.initState();
-  //startTimer();
+    //startTimer();
     fetchFrames(); // Fetch frames data from the API
   }
 
@@ -282,7 +282,7 @@ class _ChooseFrameState extends State<ChooseFrame> {
                         children: [
                           Center(
                             child: Container(
-                              height:MediaQuery.of(context).size.height * 0.75,
+                              height: MediaQuery.of(context).size.height * 0.75,
                               width: 700,
                               margin: const EdgeInsets.symmetric(vertical: 20),
                               decoration: BoxDecoration(
@@ -309,7 +309,7 @@ class _ChooseFrameState extends State<ChooseFrame> {
                                     ),
                                     const SizedBox(height: 100),
                                     _buildFrameGrid(context),
-                                  Spacer(),
+                                    Spacer(),
                                     _buildNavigationButtons(),
                                     const SizedBox(height: 20),
                                   ],
