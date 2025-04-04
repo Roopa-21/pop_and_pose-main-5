@@ -78,7 +78,7 @@ class CameraApi {
     });
   }
 
-  Future<List<String>> getThumbnailsList() async {
+  Future<List<String>> getThumbnailsList(int photos) async {
     try {
       // Step 1: Get contents root
       final contentsData =
@@ -92,10 +92,10 @@ class CameraApi {
 
       // Step 3: Get folder contents
       final listData = await _fetchJSON('$latestFolder?kind=list');
-print("data is ${_extractThumbnailUrls(listData[CameraAPIConstants.url])}");
+      print(
+          "data is ${_extractThumbnailUrls(listData[CameraAPIConstants.url], photos)}");
 
-      return _extractThumbnailUrls(listData[CameraAPIConstants.url]);
-      
+      return _extractThumbnailUrls(listData[CameraAPIConstants.url], photos);
     } catch (e) {
       // Rethrow the error wrapped in a Future to match the return type
       return Future.error(
@@ -123,18 +123,15 @@ print("data is ${_extractThumbnailUrls(listData[CameraAPIConstants.url])}");
     });
   }
 
-  List<String> _extractThumbnailUrls(List<dynamic> urls) {
+  List<String> _extractThumbnailUrls(List<dynamic> urls, int noOfPhotos) {
     return urls
         .map((url) =>
             url.contains('?') ? '$url&kind=thumbnail' : '$url?kind=thumbnail')
         .toList()
         .reversed
-        .take(8)
+        .take(noOfPhotos)
         .toList()
         .reversed
         .toList();
-
   }
-  
-  
 }

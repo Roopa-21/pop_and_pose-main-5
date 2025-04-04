@@ -19,10 +19,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pop_and_pose/src/utils/getDeviceInfo.dart';
 import 'package:http/http.dart' as http;
 
-
-
-
-
 class CapturePhotos extends StatefulWidget {
   final Map<String, dynamic>? imageInfo;
   final int? copies;
@@ -42,39 +38,69 @@ class _CapturePhotosState extends State<CapturePhotos> {
   StreamSubscription<CameraState>? _cameraStateSubscription;
   String? backgroundImageUrl;
   String? deviceModel;
-   Timer? autoCaptureTimer; 
-  int currentPhoto = 0; 
+  Timer? autoCaptureTimer;
+  int currentPhoto = 0;
   int remainingTimeForAutoCapture = 0;
+  int noOfPhotos = 2;
   @override
   void initState() {
     super.initState();
     _cameraBloc = context.read<CameraBloc>();
     _getDeviceInfo();
+    fetchUserData();
     startTimer();
     _subscribeToCamera();
     startAutoCaptureTimer();
   }
-Future<void> _getDeviceInfo() async {
-    List<String> deviceInfo=await Getdeviceinformation().getDevice();
- 
+
+  Future<void> _getDeviceInfo() async {
+    List<String> deviceInfo = await Getdeviceinformation().getDevice();
+
     setState(() {
       deviceModel = deviceInfo[0];
-   
     });
- 
+
     if (deviceModel != null) {
-      String? imageUrl=await Getdeviceinformation().fetchBackgroundImage(deviceModel!);
+      String? imageUrl =
+          await Getdeviceinformation().fetchBackgroundImage(deviceModel!);
       setState(() {
-        backgroundImageUrl=imageUrl;
+        backgroundImageUrl = imageUrl;
       });
-        
     }
   }
+
+  Future<void> fetchUserData() async {
+    final url = Uri.parse(
+        'https://pop-pose-backend.vercel.app/api/user/getDetailsByUserId/${widget.userId}');
+
+    try {
+      final response = await http.get(url);
+      print('Response Status Code: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final user = data['user'];
+
+        // Safely parsing the data with null checks
+        setState(() {
+          final frameSelection = user['frame_Selection'];
+          noOfPhotos = frameSelection['no_of_photos'] ?? 2;
+        });
+
+        print('noOfPhoto: $noOfPhotos');
+      } else {
+        print('Failed to load user data. Status Code: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('Error fetching user data: $error');
+    }
+  }
+
   @override
   void dispose() {
     stopTimer();
     _cameraStateSubscription?.cancel();
-     autoCaptureTimer?.cancel(); 
+    autoCaptureTimer?.cancel();
     super.dispose();
   }
 
@@ -122,14 +148,15 @@ Future<void> _getDeviceInfo() async {
   void stopTimer() {
     _timer?.cancel();
   }
-    void startAutoCaptureTimer() async {
-final duration1= await fetchDuration(1)??7;
-final duration2=await fetchDuration(2)??5;
-  print("Duration1 : $duration1");
-  print("Duration2 : $duration2");
+
+  void startAutoCaptureTimer() async {
+    final duration1 = await fetchDuration(1) ?? 7;
+    final duration2 = await fetchDuration(2) ?? 5;
+    print("Duration1 : $duration1");
+    print("Duration2 : $duration2");
 
     autoCaptureTimer = Timer(Duration(seconds: duration1), () {
-      takePicture(); 
+      takePicture();
       autoCaptureTimer = Timer.periodic(Duration(seconds: duration2), (timer) {
         takePicture();
       });
@@ -137,42 +164,43 @@ final duration2=await fetchDuration(2)??5;
   }
 
   Future<int?> fetchDuration(int timerId) async {
-  try {
-    final response = await http.post(
-      Uri.parse("https://pop-pose-backend.vercel.app/api/time/getTimer/$timerId"),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(
+            "https://pop-pose-backend.vercel.app/api/time/getTimer/$timerId"),
+      );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-     print('data:$data');
-      if (data.containsKey('value')) {
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('data:$data');
+        if (data.containsKey('value')) {
           print("Fetched duration: ${data['value']}");
-        return data['value']; 
+          return data['value'];
+        } else {
+          print('Value not found in the response');
+          return null;
+        }
       } else {
-        print('Value not found in the response');
+        print('Failed to fetch duration from backend');
         return null;
       }
-    } else {
-      print('Failed to fetch duration from backend');
+    } catch (e) {
+      print('Error fetching duration: $e');
       return null;
     }
-  } catch (e) {
-    print('Error fetching duration: $e');
-    return null;
   }
-}
 
- void takePicture() {
-   
-    if (currentPhoto < 8) {
+  void takePicture() {
+    if (currentPhoto < 1) {
       _cameraBloc.add(TakePictureEvent());
       setState(() {
         currentPhoto++;
       });
     } else {
-      autoCaptureTimer?.cancel();  
+      autoCaptureTimer?.cancel();
     }
   }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -246,13 +274,13 @@ final duration2=await fetchDuration(2)??5;
               fit: StackFit.expand,
               children: [
                 backgroundImageUrl != null
-              ? Image.network(
-                backgroundImageUrl!,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              )
-              : const Center(child: CircularProgressIndicator()),
+                    ? Image.network(
+                        backgroundImageUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      )
+                    : const Center(child: CircularProgressIndicator()),
                 SafeArea(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
@@ -301,7 +329,8 @@ final duration2=await fetchDuration(2)??5;
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Texts(
-                                        texts: 'Capture 8 Photos!',
+                                        texts:
+                                            'Capture ${noOfPhotos * 2} Photos!',
                                         fontSize: fontSize,
                                         color:
                                             const Color.fromRGBO(21, 20, 38, 1),
@@ -360,11 +389,10 @@ final duration2=await fetchDuration(2)??5;
                                             flex: 1,
                                             child: Align(
                                               alignment: Alignment.centerRight,
-                                              child: 
-                                              AppBtn(
+                                              child: AppBtn(
                                                 width: 120,
-  onTap: (){
-     context
+                                                onTap: () {
+                                                  context
                                                       .read<CameraBloc>()
                                                       .add(StopLiveViewEvent());
                                                   Get.to(() => PhotoSelector(
@@ -372,15 +400,17 @@ final duration2=await fetchDuration(2)??5;
                                                             widget.imageInfo,
                                                         copies: widget.copies,
                                                         userId: widget.userId,
+                                                        noOfPhotos:
+                                                            noOfPhotos * 2,
                                                       ));
-  },
-   child: const Texts(
+                                                },
+                                                child: const Texts(
                                                   texts: 'Next',
                                                   fontSize: 22,
                                                   fontWeight: FontWeight.w600,
                                                   color: Colors.white,
                                                 ),
-),
+                                              ),
                                               // ElevatedButton(
                                               //   onPressed: () {
                                               //     context
@@ -407,7 +437,7 @@ final duration2=await fetchDuration(2)??5;
                                               //   child: const Text(
                                               //     "Next",
                                               //     style:
-                                                  
+
                                               //         TextStyle(fontSize: 16),
                                               //   ),
                                               // ),

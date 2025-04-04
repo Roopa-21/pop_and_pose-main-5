@@ -17,7 +17,10 @@ class FetchLiveViewEvent extends CameraEvent {}
 
 class StopLiveViewEvent extends CameraEvent {}
 
-class FetchThumbnailsList extends CameraEvent {}
+class FetchThumbnailsList extends CameraEvent {
+    final int noOfPhotos;
+    FetchThumbnailsList(this.noOfPhotos);
+}
 
 class SetISOEvent extends CameraEvent {
   final int value;

@@ -22,62 +22,150 @@ import 'package:pop_and_pose/src/feature/widgets/progressindicator.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:pop_and_pose/src/utils/getDeviceInfo.dart';
 
- 
 class PhotoSelector extends StatefulWidget {
   final Map<String, dynamic>? imageInfo;
   final String userId;
   final int? copies;
+  final int? noOfPhotos;
+
   const PhotoSelector(
-      {super.key, this.imageInfo, this.copies, required this.userId});
- 
+      {super.key,
+      this.imageInfo,
+      this.copies,
+      required this.userId,
+      this.noOfPhotos});
+
   @override
   _PhotoSelectorState createState() => _PhotoSelectorState();
 }
- 
+
 class _PhotoSelectorState extends State<PhotoSelector> {
   Map<int, Uint8List> selectedImages = {}; // Change the value type to Uint8List
-  int countdown =800;
+  int countdown = 800;
   Timer? _timer;
-    String? backgroundImageUrl;
+  String? backgroundImageUrl;
   String? deviceModel;
- 
+  int rows = 3;
+  int columns = 2;
+  double padding = 10.0;
+  double horizontalGap = 10.0;
+  double verticalGap = 10.0;
+  String imageShape = 'circle';
+  Map<int, double> _rotationAngles = {};
+  Map<int, double> _scales = {};
   // Handle image selection and store actual byte data
-  void _handleImageSelection(Uint8List imageBytes) {
-    if (selectedImages.containsValue(imageBytes)) {
-      setState(() {
-        selectedImages.removeWhere((key, value) => value == imageBytes);
-      });
-    } else if (selectedImages.length < getMaxImages()) {
-      for (int i = 1; i <= getMaxImages(); i++) {
-        if (!selectedImages.containsKey(i)) {
-          setState(() {
-            selectedImages[i] = imageBytes;
-          });
-          break;
-        }
+  // void _handleImageSelection(Uint8List imageBytes) {
+  //   if (selectedImages.containsValue(imageBytes)) {
+  //     setState(() {
+  //       selectedImages.removeWhere((key, value) => value == imageBytes);
+  //     });
+  //   } else if (selectedImages.length < getMaxImages()) {
+  //     for (int i = 1; i <= getMaxImages(); i++) {
+  //       if (!selectedImages.containsKey(i)) {
+  //         setState(() {
+  //           selectedImages[i] = imageBytes;
+  //         });
+  //         break;
+  //       }
+  //     }
+  //   }
+  // }
+  void _handleImageSelection(Uint8List image, int index) {
+    setState(() {
+      if (selectedImages.containsKey(index)) {
+        selectedImages.remove(index);
+      } else {
+        selectedImages[index] = image;
       }
+    });
+  }
+
+  Future<void> fetchUserData() async {
+    final url = Uri.parse(
+        'https://pop-pose-backend.vercel.app/api/user/getDetailsByUserId/${widget.userId}');
+
+    try {
+      final response = await http.get(url);
+      print('Response Status Code: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final user = data['user'];
+
+        // Safely parsing the data with null checks
+        setState(() {
+          final frameSelection = user['frame_Selection'];
+
+          rows = frameSelection['rows'] ?? 3;
+          columns = frameSelection['columns'] ?? 2;
+          padding = (frameSelection['padding'] ?? 10).toDouble();
+          horizontalGap = (frameSelection['horizontal_gap'] ?? 10).toDouble();
+          verticalGap = (frameSelection['vertical_gap'] ?? 10).toDouble();
+          imageShape = frameSelection['shapes'] ?? 'circle';
+        });
+      } else {
+        print('Failed to load user data. Status Code: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('Error fetching user data: $error');
     }
   }
-  Future<void> clearImages() async {
-    selectedImages.clear(); 
-    
+
+  Widget buildImageShape(String shape, Uint8List imageBytes, int imageKey) {
+    Widget transformedImage = Transform.rotate(
+      angle: _rotationAngles[imageKey] ?? 0.0,
+      child: Transform.scale(
+        scale: _scales[imageKey] ?? 1.0,
+        child: Image.memory(
+          imageBytes,
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+
+    switch (shape.toLowerCase()) {
+      case 'circle':
+        return ClipOval(
+          child: Container(
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+            ),
+            child: transformedImage,
+          ),
+        );
+      case 'rectangle':
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: transformedImage,
+        );
+      default:
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: transformedImage,
+        );
+    }
   }
- Future<void> _getDeviceInfo() async {
-    List<String> deviceInfo=await Getdeviceinformation().getDevice();
- 
+
+  Future<void> clearImages() async {
+    selectedImages.clear();
+  }
+
+  Future<void> _getDeviceInfo() async {
+    List<String> deviceInfo = await Getdeviceinformation().getDevice();
+
     setState(() {
       deviceModel = deviceInfo[0];
-   
     });
- 
+
     if (deviceModel != null) {
-      String? imageUrl=await Getdeviceinformation().fetchBackgroundImage(deviceModel!);
+      String? imageUrl =
+          await Getdeviceinformation().fetchBackgroundImage(deviceModel!);
       setState(() {
-        backgroundImageUrl=imageUrl;
+        backgroundImageUrl = imageUrl;
       });
-        
     }
   }
+
   int getMaxImages() {
     if (widget.imageInfo != null && widget.imageInfo!['name'] != null) {
       switch (widget.imageInfo!['name']) {
@@ -95,7 +183,7 @@ class _PhotoSelectorState extends State<PhotoSelector> {
     }
     return 4;
   }
- 
+
   // Start the countdown timer
   void startTimer() {
     stopTimer();
@@ -110,40 +198,49 @@ class _PhotoSelectorState extends State<PhotoSelector> {
       });
     });
   }
- 
+
   void stopTimer() {
     _timer?.cancel();
   }
- 
+
   @override
   void initState() {
     super.initState();
+    print('rr${widget.imageInfo}');
     startTimer();
-      _getDeviceInfo();
-    context.read<CameraBloc>().add(FetchThumbnailsList());
+    _getDeviceInfo();
+
+    fetchUserData();
+    selectedImages.forEach((key, value) {
+      _rotationAngles[key] = 0.0;
+      _scales[key] = 1.0;
+    });
+
+    context.read<CameraBloc>().add(FetchThumbnailsList(widget.noOfPhotos ?? 2));
     clearImages();
   }
- 
+
   @override
   void dispose() {
     stopTimer();
     super.dispose();
   }
- 
+
   // Upload selected images to backend
   Future<void> uploadImage() async {
-    if (selectedImages.length < 4) {
-      Get.snackbar('Error', 'Please select 4 images before uploading.');
+    if (selectedImages.length < widget.noOfPhotos! / 2) {
+      Get.snackbar('Error',
+          'Please select ${widget.noOfPhotos! / 2} images before uploading.');
       return;
     }
- 
+
     // Prepare the data for uploading
     try {
       var request = http.MultipartRequest(
           'POST', Uri.parse(BaseurlForBackend.uploadimage));
- 
+
       request.fields['userId'] = widget.userId;
- 
+
       // Add the selected images (stored as Uint8List) to the request
       selectedImages.forEach((key, value) {
         request.files.add(http.MultipartFile.fromBytes(
@@ -153,9 +250,9 @@ class _PhotoSelectorState extends State<PhotoSelector> {
           contentType: MediaType('image', 'jpeg'),
         ));
       });
- 
+
       var response = await request.send();
- 
+
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
         final responseData = json.decode(responseBody);
@@ -163,10 +260,9 @@ class _PhotoSelectorState extends State<PhotoSelector> {
         // Optionally navigate to the next screen
         // Get.to(() => PrintScreenPage(
         //     imageUrls: responseData['imageUrls'], copies: widget.copies));
-        Get.to(() => Framebackground(userId1: widget.userId,
-        ));
-      
-        
+        Get.to(() => Framebackground(
+              userId1: widget.userId,
+            ));
       } else {
         Get.snackbar('Error', 'Failed to upload images');
       }
@@ -174,16 +270,16 @@ class _PhotoSelectorState extends State<PhotoSelector> {
       Get.snackbar('Error', 'An error occurred while uploading images');
     }
   }
- 
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CameraBloc, CameraState>(
-    builder: (context, state) {
-      List<Uint8List> thumbnailsList = [];
-      if (state is ThumbnailsFetchedState) {
-        thumbnailsList = state.thumbnailsList;
-      }
- 
+      builder: (context, state) {
+        List<Uint8List> thumbnailsList = [];
+        if (state is ThumbnailsFetchedState) {
+          thumbnailsList = state.thumbnailsList;
+        }
+
         return PopScope(
           canPop: true,
           onPopInvoked: (didPop) {
@@ -193,16 +289,16 @@ class _PhotoSelectorState extends State<PhotoSelector> {
           },
           child: Scaffold(
             body: Stack(
-fit: StackFit.expand,
+              fit: StackFit.expand,
               children: [
-                  backgroundImageUrl != null
-              ? Image.network(
-                backgroundImageUrl!,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              )
-              : const Center(child: CircularProgressIndicator()),
+                backgroundImageUrl != null
+                    ? Image.network(
+                        backgroundImageUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      )
+                    : const Center(child: CircularProgressIndicator()),
                 SafeArea(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
@@ -210,7 +306,7 @@ fit: StackFit.expand,
                       final screenHeight = constraints.maxHeight;
                       final containerWidth =
                           screenWidth > 900 ? 900.0 : screenWidth * 0.9;
-                 
+
                       return Column(
                         children: [
                           // Timer
@@ -236,7 +332,7 @@ fit: StackFit.expand,
                               ),
                             ),
                           ),
-                
+
                           // Main Content
                           Expanded(
                             child: Center(
@@ -256,7 +352,8 @@ fit: StackFit.expand,
                                         borderRadius: BorderRadius.circular(20),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.05),
+                                            color:
+                                                Colors.black.withOpacity(0.05),
                                             blurRadius: 8,
                                             spreadRadius: 2,
                                           ),
@@ -270,13 +367,15 @@ fit: StackFit.expand,
                                               CrossAxisAlignment.start,
                                           children: [
                                             const Texts(
-                                              texts: 'Select The Photos You Like',
+                                              texts:
+                                                  'Select The Photos You Like',
                                               fontSize: 24,
                                               fontWeight: FontWeight.bold,
                                               color:
                                                   Color.fromRGBO(21, 20, 38, 1),
                                             ),
-                                            SizedBox(height: screenHeight * 0.02),
+                                            SizedBox(
+                                                height: screenHeight * 0.02),
                                             Expanded(
                                               child: Row(
                                                 crossAxisAlignment:
@@ -284,6 +383,7 @@ fit: StackFit.expand,
                                                 children: [
                                                   // Grid of thumbnails
                                                   Expanded(
+                                                    flex: 1,
                                                     child: GridView.builder(
                                                       shrinkWrap: true,
                                                       gridDelegate:
@@ -301,28 +401,40 @@ fit: StackFit.expand,
                                                       itemBuilder:
                                                           (context, index) {
                                                         final imagePath =
-                                                            thumbnailsList[index];
+                                                            thumbnailsList[
+                                                                index];
                                                         final isSelected =
                                                             selectedImages
                                                                 .containsValue(
                                                                     imagePath);
-                 
+
                                                         return GestureDetector(
                                                           onTap: () {
-                                                            _handleImageSelection(
-                                                                imagePath
-                                                                    as Uint8List);
+                                                            if (selectedImages
+                                                                        .length <
+                                                                    (widget.noOfPhotos!) ||
+                                                                selectedImages
+                                                                    .containsValue(
+                                                                        imagePath))
+                                                              _handleImageSelection(
+                                                                  imagePath
+                                                                      as Uint8List,
+                                                                  index);
                                                           },
                                                           child: Container(
                                                             decoration:
                                                                 BoxDecoration(
-                                                              border: Border.all(
+                                                              border:
+                                                                  Border.all(
                                                                 color: isSelected
-                                                                    ? Colors.green
-                                                                    : Colors.grey,
-                                                                width: isSelected
-                                                                    ? 3
-                                                                    : 1,
+                                                                    ? Colors
+                                                                        .green
+                                                                    : Colors
+                                                                        .grey,
+                                                                width:
+                                                                    isSelected
+                                                                        ? 3
+                                                                        : 1,
                                                               ),
                                                               borderRadius:
                                                                   BorderRadius
@@ -330,16 +442,17 @@ fit: StackFit.expand,
                                                                           12),
                                                             ),
                                                             child: ClipRRect(
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          12),
-                                                              child:
-                                                                  Image.memory(
-                            thumbnailsList[index],
-                            fit: BoxFit.cover,
-                          )
-                                                            ),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            12),
+                                                                child: Image
+                                                                    .memory(
+                                                                  thumbnailsList[
+                                                                      index],
+                                                                  fit: BoxFit
+                                                                      .cover,
+                                                                )),
                                                           ),
                                                         );
                                                       },
@@ -349,6 +462,7 @@ fit: StackFit.expand,
                                                       width: screenWidth * 0.2),
                                                   // Preview container
                                                   Expanded(
+                                                      flex: 2,
                                                       child:
                                                           getContainerWidget()),
                                                 ],
@@ -363,35 +477,32 @@ fit: StackFit.expand,
                               ),
                             ),
                           ),
-                 
+
                           // Bottom Buttons
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 20),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                
-                
-                                 Btn(
-                              onTap: () { 
-                                 stopTimer();
-                                      Get.offAll(() => const SplashScreenPage());
-                              },
-                              width: 150,
-                              child: const Texts(
-                                texts: 'Back',
-                                fontSize: 22,
-                                fontWeight: FontWeight.w600,
-                                color: AppColor.kAppColor,
-                              ),
-                            ),
+                                Btn(
+                                  onTap: () {
+                                    stopTimer();
+                                    Get.offAll(() => const SplashScreenPage());
+                                  },
+                                  width: 150,
+                                  child: const Texts(
+                                    texts: 'Back',
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColor.kAppColor,
+                                  ),
+                                ),
                                 // ConstrainedBox(
                                 //   constraints: const BoxConstraints(
                                 //     maxWidth: 150,
                                 //     minWidth: 120,
                                 //   ),
-                                 
-                                 
+
                                 //   child: OutlinedButton(
                                 //     onPressed: () {
                                 //       stopTimer();
@@ -442,7 +553,7 @@ fit: StackFit.expand,
       },
     );
   }
- 
+
 //   Widget getContainerWidget() {
 //     if (widget.imageInfo != null && widget.imageInfo!['name'] != null) {
 //       switch (widget.imageInfo!['name']) {
@@ -461,25 +572,63 @@ fit: StackFit.expand,
 //     return contFour(selectedImages.cast<int, String>());
 //   }
 // }
- Widget getContainerWidget() {
-  if (widget.imageInfo != null && widget.imageInfo!['name'] != null) {
-    switch (widget.imageInfo!['name']) {
-      case 'one':
-        return contOne(selectedImages);
-      case 'two':
-        return contTwo(selectedImages);
-      case 'three':
-        return contFour(selectedImages);
-      case 'four':
-        return sixthCont(selectedImages);
-      default:
-        return contFour(selectedImages);
-    }
+  // Widget getContainerWidget() {
+  //   print('gg${widget.imageInfo}');
+  //   if (widget.imageInfo != null && widget.imageInfo!['name'] != null) {
+  //     switch (widget.imageInfo!['name']) {
+  //       case 'one':
+  //         return contOne(selectedImages);
+  //       case 'two':
+  //         return contTwo(selectedImages);
+  //       case 'three':
+  //         return contFour(selectedImages);
+  //       case 'four':
+  //         return sixthCont(selectedImages);
+  //       default:
+  //         return contFour(selectedImages);
+  //     }
+  //   }
+  //   return contFour(selectedImages);
+  // }
+  Widget getContainerWidget() {
+    return selectedImages.isEmpty
+        ? const Center(child: Text("No images selected"))
+        : Container(
+            height: 480,
+            color: AppColor.kAppColorGrey,
+            child: GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.symmetric(
+                  vertical: verticalGap, horizontal: horizontalGap),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                crossAxisSpacing: horizontalGap,
+                mainAxisSpacing: verticalGap,
+                childAspectRatio: 1,
+              ),
+              itemCount: selectedImages.length,
+              itemBuilder: (context, index) {
+                int imageKey = selectedImages.keys.elementAt(index);
+                Uint8List imageBytes = selectedImages[imageKey]!;
+
+                return GestureDetector(
+                  onScaleUpdate: (details) {
+                    setState(() {
+                      _scales[imageKey] = details.scale.clamp(0.5, 3.0);
+                      _rotationAngles[imageKey] = details.rotation;
+                    });
+                  },
+                  child: buildImageShape(imageShape, imageBytes, imageKey),
+                );
+                // final imageBytes = selectedImages.values.elementAt(index);
+                // return buildImageShape(imageShape, imageBytes);
+              },
+            ),
+          );
   }
-  return contFour(selectedImages);
 }
-}
-contOne(Map<int, Uint8List> selectedImages){
+
+contOne(Map<int, Uint8List> selectedImages) {
   return Containers(
     width: 200,
     height: 600,
@@ -547,7 +696,7 @@ contOne(Map<int, Uint8List> selectedImages){
     ),
   );
 }
- 
+
 Widget contTwo(Map<int, Uint8List> selectedImages) {
   return Containers(
     width: 400,
@@ -686,7 +835,7 @@ Widget contFour(Map<int, Uint8List> selectedImages) {
     ),
   );
 }
- 
+
 Widget sixthCont(Map<int, Uint8List> selectedImages) {
   return Containers(
     width: 400,

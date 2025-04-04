@@ -1,4 +1,3 @@
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -9,19 +8,16 @@ import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_
 import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_event.dart';
 import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_state.dart';
 import 'package:pop_and_pose/src/feature/screen/choose_frame/page/choose_frame.dart';
-import 'package:pop_and_pose/src/feature/screen/choose_screen/page/choose_screen.dart';
-import 'package:pop_and_pose/src/feature/screen/num_of_copies/page/num_of_copies.dart';
 import 'package:pop_and_pose/src/feature/screen/register_device/page/register_device.dart';
-import 'package:pop_and_pose/src/feature/screen/settings/page/settings.dart';
 import 'package:pop_and_pose/src/feature/widgets/app_texts.dart';
 import 'package:pop_and_pose/src/feature/widgets/containers.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'package:get/get.dart';
+import 'package:pdf/pdf.dart'; // PDF generation support
+import 'package:pdf/widgets.dart' as pw;
 import 'package:pop_and_pose/src/feature/widgets/progressindicator.dart';
-
-import 'package:step_progress_indicator/step_progress_indicator.dart';
 
 import '../../../../utils/getDeviceInfo.dart';
 
@@ -55,17 +51,11 @@ class _SplashScreenPageState extends State<SplashScreenPage>
     super.dispose();
   }
 
-
-
-   Future<void> _getDeviceInfo() async {
-   
-   List<String> deviceInfo=await Getdeviceinformation().getDevice();
-setState(() {
-  _deviceInfo=deviceInfo[0];
-});
- 
-  
- 
+  Future<void> _getDeviceInfo() async {
+    List<String> deviceInfo = await Getdeviceinformation().getDevice();
+    setState(() {
+      _deviceInfo = deviceInfo[0];
+    });
   }
 
   Future<bool> checkDeviceExists() async {
@@ -73,15 +63,15 @@ setState(() {
         "https://pop-pose-backend.vercel.app/api/background/devices";
     try {
       final response = await http.get(Uri.parse(apiUrl));
- 
+
       if (response.statusCode == 200) {
         List<dynamic> devices = jsonDecode(response.body);
         String? currentDeviceKey = _deviceInfo;
         print('deviceModel $currentDeviceKey');
- 
+
         bool deviceExists =
             devices.any((device) => device['device_key'] == currentDeviceKey);
-            print('object $deviceExists');
+        print('object $deviceExists');
         return deviceExists;
       } else {
         debugPrint("Failed to fetch devices: ${response.statusCode}");
@@ -92,6 +82,7 @@ setState(() {
       return false;
     }
   }
+
   Future<void> _submitWithoutUser() async {
     // Prepare request body
     Map<String, String> requestBody = {
@@ -116,10 +107,9 @@ setState(() {
 
           if (userObject != null && userObject.containsKey('_id')) {
             String userId = userObject['_id'] ?? ''; // Get user ID safely
-print('jjj$userId');
+            print('jjj$userId');
 
             if (userId.isNotEmpty) {
-           
               Get.to(
                 () => ChooseFrame(userId: userId),
               );
@@ -324,15 +314,14 @@ print('jjj$userId');
                             fit: BoxFit.contain,
                           ),
                         ),
-
                         const SizedBox(height: 60),
-                       const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 25),
-                    child: CircularProgressIndicatorContainer(
-                      progressValue: 0.05,
-                      horizontal: 120,
-                    ),
-                  ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 25),
+                          child: CircularProgressIndicatorContainer(
+                            progressValue: 0.05,
+                            horizontal: 120,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -370,23 +359,19 @@ print('jjj$userId');
       );
     } else {
       return GestureDetector(
-        onTap: () async
-        {
-          
-            bool exists = await checkDeviceExists();
-            if (exists) {
-           context.read<CameraBloc>().add(DiscoverCameraEvent());
-          
-            } else {
-              Get.offAll(() =>
-                  const RegisterDevice());
-            }
+        onTap: () async {
+          bool exists = await checkDeviceExists();
+          if (exists) {
+            context.read<CameraBloc>().add(DiscoverCameraEvent());
+          } else {
+            Get.offAll(() => const RegisterDevice());
+          }
 
-   //    context.read<CameraBloc>().add(DiscoverCameraEvent());
-          
-        //Get.offAll(() => const RegisterDevice());
-      
-      //  Get.offAll(() =>  const SettingsPage());
+          //   context.read<CameraBloc>().add(DiscoverCameraEvent());
+
+          //Get.offAll(() => const RegisterDevice());
+
+          //  Get.offAll(() =>  const SettingsPage());
         },
         child: const Texts(
           texts: 'Touch the screen to START',

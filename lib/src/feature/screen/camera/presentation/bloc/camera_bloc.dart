@@ -101,7 +101,7 @@ class CameraBloc extends Bloc<CameraEvent, CameraState> {
       FetchThumbnailsList event, Emitter<CameraState> emit) async {
     try {
       // Fetch thumbnail URLs
-      final thumbnailUrls = await _cameraService.getThumbnailsList();
+      final thumbnailUrls = await _cameraService.getThumbnailsList(event.noOfPhotos);
       print('hhhh$thumbnailUrls');
       if (thumbnailUrls == null || thumbnailUrls.isEmpty) {
         emit(CameraError('No thumbnails found'));

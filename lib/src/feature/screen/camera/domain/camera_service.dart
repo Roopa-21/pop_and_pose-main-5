@@ -8,7 +8,7 @@ abstract class CameraService {
   Future<http.Response?> startLiveView();
   Future<void> stopLiveView();
   Future<Stream<Uint8List?>> fetchLiveView();
-  Future<List<String>?> getThumbnailsList();
+  Future<List<String>?> getThumbnailsList(int photos);
   Future<void> setISO(int value);
   Future<void> setWhiteBalance(String value);
 }

@@ -46,9 +46,9 @@ class CameraRepository {
     return await _cameraApi!.startFetchingLiveView();
   }
 
-  Future<List<String>?> getThumbnailsList() async {
+  Future<List<String>?> getThumbnailsList(int photos) async {
     _ensureCameraApi();
-    return await _cameraApi!.getThumbnailsList();
+    return await _cameraApi!.getThumbnailsList(photos);
   }
 
   Future<void> stopLiveView() async {

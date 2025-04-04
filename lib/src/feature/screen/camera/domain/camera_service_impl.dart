@@ -36,8 +36,8 @@ class CameraServiceImpl implements CameraService {
   }
 
   @override
-  Future<List<String>?> getThumbnailsList() async {
-    return await _repository.getThumbnailsList();
+  Future<List<String>?> getThumbnailsList(int photos) async {
+    return await _repository.getThumbnailsList(photos);
   }
 
   @override
