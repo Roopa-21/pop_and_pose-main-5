@@ -3,14 +3,18 @@ import 'dart:convert';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/route_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:pop_and_pose/src/constant/api_constants.dart';
 import 'package:pop_and_pose/src/constant/colors.dart';
 import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_bloc.dart';
 import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_event.dart';
+import 'package:pop_and_pose/src/feature/screen/splash_screen/page/splash_screen.dart';
 import 'package:pop_and_pose/src/feature/widgets/app_btn.dart';
 
 import 'package:pop_and_pose/src/feature/widgets/app_texts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RegisterDevice extends StatefulWidget {
   const RegisterDevice({super.key});
@@ -22,9 +26,11 @@ class RegisterDevice extends StatefulWidget {
 class _RegisterDeviceState extends State<RegisterDevice> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _latController = TextEditingController();
-  // final TextEditingController _longController = TextEditingController();
+   final TextEditingController _baseUrl = TextEditingController();
+      final TextEditingController _printerName = TextEditingController();
   String? _deviceInfo;
   String? deviceKey;
+
 
   var deviceData = <String, dynamic>{};
   @override
@@ -48,10 +54,15 @@ class _RegisterDeviceState extends State<RegisterDevice> {
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       String address = _latController.text;
-      //  String longitude = _longController.text;
+        String baseUrl = _baseUrl.text;
+         String printerName = _printerName.text;
       String device = _deviceInfo ?? "Unknown Device";
 
       try {
+          SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('base_url', baseUrl);
+      await prefs.setString('printer_name', printerName);
+
         print('device $device device key $deviceKey');
         var response = await http.post(
           Uri.parse(
@@ -59,7 +70,10 @@ class _RegisterDeviceState extends State<RegisterDevice> {
           body: jsonEncode({
             "device_key": device,
             "device_name": deviceKey,
-            "address": address
+            "address": address,
+
+            "base_url":baseUrl,
+            "printer_name":printerName
           }),
           headers: {
             "Content-Type": "application/json",
@@ -73,7 +87,10 @@ class _RegisterDeviceState extends State<RegisterDevice> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Location submitted successfully!")),
           );
-          context.read<CameraBloc>().add(DiscoverCameraEvent());
+         // context.read<CameraBloc>().add(DiscoverCameraEvent());
+           Get.to(
+                () => SplashScreenPage(),
+              );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Failed to submit location!")),
@@ -90,7 +107,9 @@ class _RegisterDeviceState extends State<RegisterDevice> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: Stack(
+        body:
+        
+         Stack(
       fit: StackFit.expand,
       children: [
         Image.asset(
@@ -170,44 +189,85 @@ class _RegisterDeviceState extends State<RegisterDevice> {
                       const SizedBox(
                         height: 30,
                       ),
-                      // TextFormField(
-                      //   cursorColor: AppColor.kAppColor,
-                      //   controller: _longController,
-                      //   keyboardType: TextInputType.number,
-                      //   decoration: InputDecoration(
-                      //     labelText: "Longitude",
-                      //     labelStyle:
-                      //         const TextStyle(color: AppColor.textColorBlack),
-                      //     border: OutlineInputBorder(
-                      //       borderRadius: BorderRadius.circular(8.0),
-                      //       borderSide: const BorderSide(
-                      //         color: AppColor.kAppColor,
-                      //         width: 1.0,
-                      //       ),
-                      //     ),
-                      //     enabledBorder: OutlineInputBorder(
-                      //       borderRadius: BorderRadius.circular(8.0),
-                      //       borderSide: const BorderSide(
-                      //         color: AppColor.kAppColor,
-                      //         width: 1.0,
-                      //       ),
-                      //     ),
-                      //     focusedBorder: OutlineInputBorder(
-                      //       borderRadius: BorderRadius.circular(8.0),
-                      //       borderSide: const BorderSide(
-                      //         color: AppColor.kAppColor,
-                      //         width: 2.0,
-                      //       ),
-                      //     ),
-                      //   ),
-                      //   validator: (value) {
-                      //     if (value == null || value.isEmpty) {
-                      //       return "Please enter longitude";
-                      //     }
-                      //     return null;
-                      //   },
-                      // ),
-                      const SizedBox(height: 30),
+                      TextFormField(
+                        cursorColor: AppColor.kAppColor,
+                        controller: _baseUrl,
+                      
+                        decoration: InputDecoration(
+                          labelText: "Base Url",
+                          labelStyle:
+                              const TextStyle(color: AppColor.textColorBlack),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                            borderSide: const BorderSide(
+                              color: AppColor.kAppColor,
+                              width: 1.0,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                            borderSide: const BorderSide(
+                              color: AppColor.kAppColor,
+                              width: 1.0,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                            borderSide: const BorderSide(
+                              color: AppColor.kAppColor,
+                              width: 2.0,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "Please enter base url";
+                          }
+                          return null;
+                        },
+                      ),
+
+
+ const SizedBox(
+                        height: 30,
+                      ),
+                      TextFormField(
+                        cursorColor: AppColor.kAppColor,
+                        controller: _printerName,
+                      
+                        decoration: InputDecoration(
+                          labelText: "Print Name",
+                          labelStyle:
+                              const TextStyle(color: AppColor.textColorBlack),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                            borderSide: const BorderSide(
+                              color: AppColor.kAppColor,
+                              width: 1.0,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                            borderSide: const BorderSide(
+                              color: AppColor.kAppColor,
+                              width: 1.0,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                            borderSide: const BorderSide(
+                              color: AppColor.kAppColor,
+                              width: 2.0,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "Please enter printer name";
+                          }
+                          return null;
+                        },
+                      ),                      const SizedBox(height: 30),
                       AppBtn(
                         onTap: _submitForm,
                         width: 300,
@@ -226,6 +286,8 @@ class _RegisterDeviceState extends State<RegisterDevice> {
           ),
         ),
       ],
-    ));
+    
+    )
+    );
   }
 }

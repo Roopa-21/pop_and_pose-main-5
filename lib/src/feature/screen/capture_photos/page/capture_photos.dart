@@ -191,7 +191,7 @@ class _CapturePhotosState extends State<CapturePhotos> {
   }
 
   void takePicture() {
-    if (currentPhoto < 1) {
+    if (currentPhoto < 2) {
       _cameraBloc.add(TakePictureEvent());
       setState(() {
         currentPhoto++;

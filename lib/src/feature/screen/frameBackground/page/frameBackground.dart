@@ -15,7 +15,9 @@ import 'package:pop_and_pose/src/feature/widgets/app_btn.dart';
 import 'package:pop_and_pose/src/feature/widgets/app_texts.dart';
 import 'package:pop_and_pose/src/utils/getDeviceInfo.dart';
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 //import 'package:printing/printing.dart';
+import 'package:http_parser/http_parser.dart';
 
 class Framebackground extends StatefulWidget {
   final String userId1;
@@ -31,6 +33,8 @@ class _FramebackgroundState extends State<Framebackground> {
   int columns = 2;
   double padding = 10.0;
   double horizontalGap = 10.0;
+  double bottomPadding = 10.0;
+  double topPadding = 10.0;
   double verticalGap = 10.0;
   String frameImage = '';
   String userId1 = '';
@@ -41,6 +45,7 @@ class _FramebackgroundState extends State<Framebackground> {
   List<dynamic> backdropImages = [];
   String? selectedBackdrop;
   List<double>? selectedFilter;
+  bool frameSize = false;
   Map<int, double> _rotationAngles = {};
   Map<int, double> _scales = {};
 
@@ -118,8 +123,6 @@ class _FramebackgroundState extends State<Framebackground> {
     super.initState();
     _getDeviceInfo();
     fetchUserData();
-
-    
   }
 
   Future<void> _getDeviceInfo() async {
@@ -174,10 +177,13 @@ class _FramebackgroundState extends State<Framebackground> {
           imageShape = frameSelection['shapes'] ?? 'circle';
           framebackdropId = frameSelection['_id'] ?? '';
           backdropImages = frameSelection['background'] ?? [];
+          topPadding = (frameSelection['topPadding'] ?? 10).toDouble();
+          bottomPadding = (frameSelection['bottomPadding'] ?? 10).toDouble();
+          frameSize = frameSelection['is2by6'] ?? false;
         });
 
         // print('Rows: $rows');
-        // print('Columns: $columns');
+        print('Columns: $columns');
         // print('Padding: $padding');
         // print('Horizontal Gap: $horizontalGap');
         // print('Vertical Gap: $verticalGap');
@@ -192,28 +198,107 @@ class _FramebackgroundState extends State<Framebackground> {
     }
   }
 
-
   final GlobalKey repaintBoundaryKey = GlobalKey();
-  Future<void> printGridView() async {
-    final gridImage = await _captureGridView(); // Capture the grid as an image
+  // Future<void> printGridView() async {
+  //   final gridImage = await _captureGridView(); // Capture the grid as an image
 
-    final document = pw.Document(); // Create a PDF document
+  //   final document = pw.Document();
 
-    final image =
-        pw.MemoryImage(gridImage); // Convert image bytes to MemoryImage
+  //   final image = pw.MemoryImage(gridImage);
 
-    document.addPage(pw.Page(
-      build: (pw.Context context) {
-        return pw.Center(
-          child: pw.Image(image), // Add the image to the PDF document
-        );
-      },
-    ));
+  //   // Define 4x6 inch page size at 300 DPI
+  //   final pageFormat = PdfPageFormat(
+  //     4.015 * PdfPageFormat.inch, // 4 inches
+  //     6.02 * PdfPageFormat.inch,
+  //     // 6 inches
+  //   );
+  //   print('dd$pageFormat');
+  //   document.addPage(
+  //     pw.Page(
+  //       pageFormat: pageFormat,
+  //       margin: pw.EdgeInsets.zero,
+  //       build: (pw.Context context) {
+  //         return pw.FullPage(
+  //           ignoreMargins: true,
+  //           child: pw.Image(
+  //             image,
+  //             fit: pw.BoxFit.fill,
+  //           ),
+  //         );
+  //       },
+  //     ),
+  //   );
 
-    // Print the document
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => document.save(),
+  //   await Printing.layoutPdf(
+  //     onLayout: (PdfPageFormat format) async => document.save(),
+  //     name: '4x6_Print.pdf',
+  //   );
+  // }
+  Future<void> _sendImageToPrinter(Uint8List imageBytes) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? baseUrl = prefs.getString('base_url');
+    String? printerName = prefs.getString('printer_name');
+    print('frameSize$frameSize');
+
+    print('printer$printerName');
+    print('baseUrl$baseUrl');
+
+    // final uri = Uri.parse("http://192.168.206.225:8000/print-image");
+    final uri = Uri.parse("http://$baseUrl/print-image");
+
+    var request = http.MultipartRequest("POST", uri)
+      ..fields['printer_name'] = printerName!;
+
+    if (frameSize) {
+      request.fields['page_size'] = 'w288h432-div2';
+    }
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        imageBytes,
+        filename: 'gridview.png',
+        contentType: MediaType('image', 'png'), // Corrected content type
+      ),
     );
+
+    try {
+      var response = await request.send();
+
+      if (response.statusCode == 307) {
+        // Handle redirect
+        String? newLocation = response.headers['location'];
+        if (newLocation != null) {
+          final newUri = Uri.parse(newLocation);
+          request = http.MultipartRequest("POST", newUri)
+            ..fields['printer_name'] = 'Popandpose_printer';
+
+          if (frameSize) {
+            request.fields['page_size'] = 'w288h432-div2';
+          }
+
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              imageBytes,
+              filename: 'gridview.png',
+              contentType: MediaType('image', 'png'), // Corrected content type
+            ),
+          );
+
+          // Retry the request with the new URI
+          response = await request.send();
+        }
+      }
+
+      if (response.statusCode == 200) {
+        print("Image sent successfully!");
+      } else {
+        print("Failed to send image. Status code: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Error sending image: $e");
+    }
   }
 
   // Function to capture the GridView as an image
@@ -221,7 +306,7 @@ class _FramebackgroundState extends State<Framebackground> {
     try {
       RenderRepaintBoundary boundary = repaintBoundaryKey.currentContext!
           .findRenderObject() as RenderRepaintBoundary;
-      var image = await boundary.toImage(pixelRatio: 3.0);
+      var image = await boundary.toImage(pixelRatio: 4.0);
       ByteData? byteData = await image.toByteData(format: ImageByteFormat.png);
       return byteData!.buffer.asUint8List();
     } catch (e) {
@@ -256,9 +341,14 @@ class _FramebackgroundState extends State<Framebackground> {
       angle: _rotationAngles[index] ?? 0.0,
       child: Transform.scale(
         scale: _scales[index] ?? 1.0,
-        child: Image.network(
-          imageUrl,
-          fit: BoxFit.fill,
+        child: ColorFiltered(
+          colorFilter: selectedFilter != null
+              ? ColorFilter.matrix(selectedFilter!)
+              : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+          ),
         ),
       ),
     );
@@ -360,6 +450,7 @@ class _FramebackgroundState extends State<Framebackground> {
                               ),
                             ),
                             Expanded(
+                              flex: 1,
                               child: GridView.builder(
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
@@ -407,58 +498,223 @@ class _FramebackgroundState extends State<Framebackground> {
                         Expanded(
                           child: RepaintBoundary(
                             key: repaintBoundaryKey,
-                            child: Padding(
-                              padding: EdgeInsets.all(padding),
-                              child: ColorFiltered(
-                                colorFilter: selectedFilter != null
-                                    ? ColorFilter.matrix(selectedFilter!)
-                                    : const ColorFilter.mode(
-                                        Colors.transparent, BlendMode.multiply),
-                                child: Container(
-                                  height: 480,
-                                  decoration: BoxDecoration(
-                                    image: selectedBackdrop != null
-                                        ? DecorationImage(
-                                            image:
-                                                NetworkImage(selectedBackdrop!),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : DecorationImage(
-                                            image: AssetImage(
-                                                'images/background.png'),
-                                            fit: BoxFit.cover,
+                            child: Container(
+                              height: 578.304,
+                              width: 384,
+                              // decoration: BoxDecoration(
+                              //   image: selectedBackdrop != null
+                              //       ? DecorationImage(
+                              //           image:
+                              //               NetworkImage(selectedBackdrop!),
+                              //           fit: BoxFit.fill,
+                              //         )
+                              //       : DecorationImage(
+                              //           image: AssetImage(
+                              //               'images/background.png'),
+                              //           fit: BoxFit.cover,
+                              //         ),
+                              // ),
+                              child: (columns == 1)
+                                  ? Row(
+                                      children: [
+                                        Expanded(
+                                          child: frameContainer(),
+
+                                          //      Container(
+                                          //   decoration: BoxDecoration(
+                                          //     image: selectedBackdrop != null
+                                          //         ? DecorationImage(
+                                          //             image: NetworkImage(
+                                          //                 selectedBackdrop!),
+                                          //             fit: BoxFit.fill,
+                                          //           )
+                                          //         : DecorationImage(
+                                          //             image: AssetImage(
+                                          //                 'images/background.png'),
+                                          //             fit: BoxFit.cover,
+                                          //           ),
+                                          //   ),
+                                          //   child: LayoutBuilder(
+                                          //     builder: (context, constraints) {
+                                          //       double itemWidth = (constraints
+                                          //                   .maxWidth -
+                                          //               ((columns - 1) *
+                                          //                   horizontalGap)) /
+                                          //           columns;
+                                          //       double itemHeight = (constraints
+                                          //                   .maxHeight -
+                                          //               ((rows - 1) *
+                                          //                   (topPadding +
+                                          //                       bottomPadding))) /
+                                          //           rows;
+
+                                          //       double aspectRatio =
+                                          //           itemWidth / itemHeight;
+
+                                          //       return GridView.builder(
+                                          //         physics:
+                                          //             NeverScrollableScrollPhysics(),
+                                          //         padding: EdgeInsets.fromLTRB(
+                                          //             15.0, 15.0, 15, 30),
+                                          //         gridDelegate:
+                                          //             SliverGridDelegateWithFixedCrossAxisCount(
+                                          //           crossAxisCount: columns,
+                                          //           crossAxisSpacing: 10,
+                                          //           mainAxisSpacing: 5,
+                                          //           childAspectRatio: 0.8,
+                                          //         ),
+                                          //         itemCount: imageUrls.length,
+                                          //         itemBuilder:
+                                          //             (context, index) {
+                                          //           return GestureDetector(
+                                          //             onScaleUpdate: (details) {
+                                          //               setState(() {
+                                          //                 _scales[index] =
+                                          //                     details.scale
+                                          //                         .clamp(
+                                          //                             0.5, 3.0);
+                                          //                 _rotationAngles[
+                                          //                         index] =
+                                          //                     details.rotation;
+                                          //               });
+                                          //             },
+                                          //             child: buildImageShape(
+                                          //                 imageShape,
+                                          //                 imageUrls[index],
+                                          //                 index),
+                                          //           );
+                                          //         },
+                                          //       );
+                                          //     },
+                                          //   ),
+                                          // )
+                                        ),
+                                        Expanded(child: frameContainer()
+
+                                            // Container(
+                                            //   decoration: BoxDecoration(
+                                            //     image: selectedBackdrop != null
+                                            //         ? DecorationImage(
+                                            //             image: NetworkImage(
+                                            //                 selectedBackdrop!),
+                                            //             fit: BoxFit.fill,
+                                            //           )
+                                            //         : DecorationImage(
+                                            //             image: AssetImage(
+                                            //                 'images/background.png'),
+                                            //             fit: BoxFit.cover,
+                                            //           ),
+                                            //   ),
+                                            //   child: LayoutBuilder(
+                                            //     builder:
+                                            //         (context, constraints) {
+                                            //       double itemWidth = (constraints
+                                            //                   .maxWidth -
+                                            //               ((columns - 1) *
+                                            //                   horizontalGap)) /
+                                            //           columns;
+                                            //       double itemHeight = (constraints
+                                            //                   .maxHeight -
+                                            //               ((rows - 1) *
+                                            //                   (topPadding +
+                                            //                       bottomPadding))) /
+                                            //           rows;
+
+                                            //       double aspectRatio =
+                                            //           itemWidth / itemHeight;
+
+                                            //       return GridView.builder(
+                                            //         physics:
+                                            //             NeverScrollableScrollPhysics(),
+                                            //         padding:
+                                            //             EdgeInsets.fromLTRB(
+                                            //                 15.0, 15.0, 15, 30),
+                                            //         gridDelegate:
+                                            //             SliverGridDelegateWithFixedCrossAxisCount(
+                                            //           crossAxisCount: columns,
+                                            //           crossAxisSpacing: 10,
+                                            //           mainAxisSpacing: 10,
+                                            //           childAspectRatio: 0.8,
+                                            //         ),
+                                            //         itemCount: imageUrls.length,
+                                            //         itemBuilder:
+                                            //             (context, index) {
+                                            //           return GestureDetector(
+                                            //             onScaleUpdate:
+                                            //                 (details) {
+                                            //               setState(() {
+                                            //                 _scales[index] =
+                                            //                     details
+                                            //                         .scale
+                                            //                         .clamp(0.5,
+                                            //                             3.0);
+                                            //                 _rotationAngles[
+                                            //                         index] =
+                                            //                     details
+                                            //                         .rotation;
+                                            //               });
+                                            //             },
+                                            //             child: buildImageShape(
+                                            //                 imageShape,
+                                            //                 imageUrls[index],
+                                            //                 index),
+                                            //           );
+                                            //         },
+                                            //       );
+                                            //     },
+                                            //   ),
+                                            // ),
+                                            ), //
+                                      ],
+                                    )
+                                  : LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        double itemWidth =
+                                            (constraints.maxWidth -
+                                                    ((columns - 1) *
+                                                        horizontalGap)) /
+                                                columns;
+                                        double itemHeight =
+                                            (constraints.maxHeight -
+                                                    ((rows - 1) *
+                                                        (topPadding +
+                                                            bottomPadding))) /
+                                                rows;
+                                        print('jj$itemHeight');
+                                        print('oo$itemWidth');
+                                        double aspectRatio =
+                                            itemWidth / itemHeight;
+                                        print('mm$aspectRatio');
+                                        return GridView.builder(
+                                          physics:
+                                              NeverScrollableScrollPhysics(),
+                                          padding: EdgeInsets.fromLTRB(
+                                              15.0, 65.0, 15, 30),
+                                          gridDelegate:
+                                              SliverGridDelegateWithFixedCrossAxisCount(
+                                            crossAxisCount: columns,
+                                            crossAxisSpacing: horizontalGap,
+                                            mainAxisSpacing: verticalGap,
+                                            childAspectRatio: 0.78,
                                           ),
-                                  ),
-                                  child: GridView.builder(
-                                    physics: NeverScrollableScrollPhysics(),
-                                    padding: EdgeInsets.symmetric(
-                                        vertical: verticalGap,
-                                        horizontal: horizontalGap),
-                                    gridDelegate:
-                                        SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: columns,
-                                      crossAxisSpacing: horizontalGap,
-                                      mainAxisSpacing: verticalGap,
-                                      childAspectRatio: 1,
+                                          itemCount: imageUrls.length,
+                                          itemBuilder: (context, index) {
+                                            return GestureDetector(
+                                              onScaleUpdate: (details) {
+                                                setState(() {
+                                                  _scales[index] = details.scale
+                                                      .clamp(0.5, 3.0);
+                                                  _rotationAngles[index] =
+                                                      details.rotation;
+                                                });
+                                              },
+                                              child: buildImageShape(imageShape,
+                                                  imageUrls[index], index),
+                                            );
+                                          },
+                                        );
+                                      },
                                     ),
-                                    itemCount: imageUrls.length,
-                                    itemBuilder: (context, index) {
-                                      return GestureDetector(
-                                        onScaleUpdate: (details) {
-                                          setState(() {
-                                            _scales[index] =
-                                                details.scale.clamp(0.5, 3.0);
-                                            _rotationAngles[index] =
-                                                details.rotation;
-                                          });
-                                        },
-                                        child: buildImageShape(imageShape,
-                                            imageUrls[index], index),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
                             ),
                           ),
                         ),
@@ -492,8 +748,14 @@ class _FramebackgroundState extends State<Framebackground> {
                             minWidth: 120,
                           ),
                           child: AppBtn(
-                            onTap: () {
-                              printGridView();
+                            onTap: () async {
+                              Uint8List imageBytes = await _captureGridView();
+                              print('rr$imageBytes');
+                              if (imageBytes.isNotEmpty) {
+                                await _sendImageToPrinter(imageBytes);
+                              } else {
+                                print("No image to send.");
+                              }
                             },
                             child: const Texts(
                               texts: 'Print',
@@ -512,6 +774,57 @@ class _FramebackgroundState extends State<Framebackground> {
           ],
         );
       }),
+    );
+  }
+
+  Widget frameContainer() {
+    return Container(
+      decoration: BoxDecoration(
+        image: selectedBackdrop != null
+            ? DecorationImage(
+                image: NetworkImage(selectedBackdrop!),
+                fit: BoxFit.fill,
+              )
+            : DecorationImage(
+                image: AssetImage('images/background.png'),
+                fit: BoxFit.cover,
+              ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          double itemWidth =
+              (constraints.maxWidth - ((columns - 1) * horizontalGap)) /
+                  columns;
+          double itemHeight = (constraints.maxHeight -
+                  ((rows - 1) * (topPadding + bottomPadding))) /
+              rows;
+
+          double aspectRatio = itemWidth / itemHeight;
+
+          return GridView.builder(
+            physics: NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(15.0, 15.0, 15, 30),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: imageUrls.length,
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onScaleUpdate: (details) {
+                  setState(() {
+                    _scales[index] = details.scale.clamp(0.5, 3.0);
+                    _rotationAngles[index] = details.rotation;
+                  });
+                },
+                child: buildImageShape(imageShape, imageUrls[index], index),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

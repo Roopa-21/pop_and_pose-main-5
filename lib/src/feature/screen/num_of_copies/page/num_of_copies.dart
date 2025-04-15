@@ -117,13 +117,39 @@ class _NumCopiesState extends State<NumCopies> {
         body: json.encode({"numberId": copyId}),
       );
 
+      //   if (response.statusCode == 200) {
+      //     final data = json.decode(response.body);
+      //     print("Selected no of copies successfully: $data");
+
+      //     Get.to(() => PaymentPageScreen(
+      //           userId: userId,
+      //         ));
+      //   } else {
+      //     ToasterService.error(message: 'Failed to select number of copies.');
+      //   }
+      // } catch (error) {
+      //   ToasterService.error(message: 'Error selecting copies: $error');
+      // }
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         print("Selected no of copies successfully: $data");
 
-        Get.to(() => PaymentPageScreen(
-              userId: userId,
-            ));
+        Get.defaultDialog(
+          title: 'Confirmation',
+          middleText:
+              'Your photos will be uploaded to admin. Do you want to continue?',
+          textCancel: 'No',
+          textConfirm: 'Yes',
+          onConfirm: () {
+            Get.back();
+            Get.to(() => PaymentPageScreen(
+                  userId: userId,
+                ));
+          },
+          onCancel: () {
+            Get.back();
+          },
+        );
       } else {
         ToasterService.error(message: 'Failed to select number of copies.');
       }

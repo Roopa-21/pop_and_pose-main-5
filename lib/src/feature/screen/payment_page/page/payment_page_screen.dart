@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/route_manager.dart';
 import 'package:pop_and_pose/src/constant/colors.dart';
 import 'package:pop_and_pose/src/constant/toaster.dart';
+import 'package:pop_and_pose/src/feature/screen/capture_photos/page/capture_photos.dart';
 import 'package:pop_and_pose/src/feature/screen/num_of_copies/page/num_of_copies.dart';
 import 'package:pop_and_pose/src/feature/screen/num_of_copies/widget/btn.dart';
 import 'package:pop_and_pose/src/feature/screen/payment_success/page/payment_success.dart';
@@ -16,6 +17,7 @@ import 'package:pop_and_pose/src/utils/getDeviceInfo.dart';
 
 class PaymentPageScreen extends StatefulWidget {
   final String userId;
+
   const PaymentPageScreen({super.key, required this.userId});
 
   @override
@@ -26,15 +28,18 @@ class _PaymentPageScreenState extends State<PaymentPageScreen> {
   Map<String, dynamic>? userData;
   int countdown = 800;
   Timer? _timer;
+  Timer? _qRTimer;
   String? backgroundImageUrl;
   String? deviceModel;
-  String? qrCodeUrl;
+  String qrCodeUrl = '';
   String? qrCodeId;
   bool? isPaymentComplete;
   int? amount;
   int? closeby;
   String remainingTime = "";
   Timer? countdownTimer;
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController couponController = TextEditingController();
 
   @override
   void initState() {
@@ -47,12 +52,9 @@ class _PaymentPageScreenState extends State<PaymentPageScreen> {
     //  startTimer();
   }
 
-  String formatTimestamp(int? timestamp) {
-    if (timestamp == null) return "N/A";
-    DateTime expiryDate = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
-    print("aa$expiryDate");
-    return "${expiryDate.day}/${expiryDate.month}/${expiryDate.year} ${expiryDate.hour}:${expiryDate.minute}";
-  }
+
+
+ 
 
   void startCountdown() {
     if (closeby == null) return;
@@ -80,10 +82,10 @@ class _PaymentPageScreenState extends State<PaymentPageScreen> {
   }
 
   void _startCheckingPaymentStatus() {
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+    _qRTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       bool paymentSuccess = await checkPaymentStatus();
       if (paymentSuccess) {
-        _timer?.cancel();
+        _qRTimer?.cancel();
         Get.to(() => PaymentSuccessPage(
               userId: widget.userId,
               copies: userData?['no_of_copies']['Number'],
@@ -137,7 +139,7 @@ class _PaymentPageScreenState extends State<PaymentPageScreen> {
           closeby = customerData['close_by'];
         });
         print('qrCode$qrCodeId');
-        startCountdown();
+        if (qrCodeUrl != '') startCountdown();
       } else {
         throw Exception("Failed to create customer");
       }
@@ -183,6 +185,36 @@ class _PaymentPageScreenState extends State<PaymentPageScreen> {
       }
     } catch (error) {
       ToasterService.error(message: 'Error fetching user data: $error');
+    }
+  }
+
+  Future<void> validateCoupon() async {
+    if (couponController.text.isEmpty) return;
+
+    final url =
+        Uri.parse("https://pop-pose-backend.vercel.app/api/coupon/validate");
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"couponCode": couponController.text}),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && data["valid"] == true) {
+      _qRTimer?.cancel();
+      print('jhjhas%${userData?['no_of_copies']['Number']}');
+      Get.to(
+        () => CapturePhotos(
+          copies: userData?['no_of_copies']['Number'],
+          userId: widget.userId,
+          
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(data["message"] ?? "Invalid coupon")),
+      );
     }
   }
 
@@ -336,7 +368,7 @@ class _PaymentPageScreenState extends State<PaymentPageScreen> {
                                               ],
                                             ),
                                           ),
-                                          VerticalDivider(
+                                          const VerticalDivider(
                                             width: 2,
                                             color: AppColor.kAppColorGrey,
                                           ),
@@ -387,18 +419,120 @@ class _PaymentPageScreenState extends State<PaymentPageScreen> {
                                                     height: 300,
                                                     width: 400,
                                                     child: Image.network(
-                                                      qrCodeUrl!,
+                                                      qrCodeUrl,
                                                       fit: BoxFit.cover,
                                                     )),
                                                 const SizedBox(height: 30),
-                                                Texts(
-                                                  texts:
-                                                      "Expires in: $remainingTime",
-                                                  //  "Expires in: ${formatTimestamp(closeby)}",
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: AppColor.kAppColor,
+                                                // if (qrCodeUrl != '')
+                                                //   Texts(
+                                                //     texts:
+                                                //         "QR Code is valid for $remainingTime mins",
+                                                //     //  "Expires in: ${formatTimestamp(closeby)}",
+                                                //     fontSize: 16,
+                                                //     fontWeight: FontWeight.w500,
+                                                //     color: AppColor.kAppColor,
+                                                //   ),
+                                                const Divider(
+                                                  color: AppColor.kAppColorGrey,
                                                 ),
+                                                Form(
+                                                  key: _formKey,
+                                                  child: Column(
+                                                    children: [
+                                                      const Texts(
+                                                        texts:
+                                                            'Enter Coupon Code',
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 10,
+                                                      ),
+                                                      TextFormField(
+                                                        cursorColor:
+                                                            AppColor.kAppColor,
+                                                        controller:
+                                                            couponController,
+                                                        keyboardType:
+                                                            TextInputType.text,
+                                                        decoration:
+                                                            InputDecoration(
+                                                          labelText:
+                                                              "Enter Coupon Code",
+                                                          labelStyle:
+                                                              const TextStyle(
+                                                                  color: AppColor
+                                                                      .textColorGrey),
+                                                          border:
+                                                              OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        8.0),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                              color: AppColor
+                                                                  .kAppColor,
+                                                              width: 1.0,
+                                                            ),
+                                                          ),
+                                                          enabledBorder:
+                                                              OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        8.0),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                              color: AppColor
+                                                                  .kAppColor,
+                                                              width: 1.0,
+                                                            ),
+                                                          ),
+                                                          focusedBorder:
+                                                              OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        8.0),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                              color: AppColor
+                                                                  .kAppColor,
+                                                              width: 2.0,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        validator: (value) {
+                                                          if (value == null ||
+                                                              value.isEmpty) {
+                                                            return "Please enter Coupon Code";
+                                                          }
+                                                          return null;
+                                                        },
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 30,
+                                                      ),
+                                                      const SizedBox(
+                                                          height: 30),
+                                                    ],
+                                                  ),
+                                                ),
+                                                (couponController
+                                                        .text.isNotEmpty)
+                                                    ? AppBtn(
+                                                        onTap: validateCoupon,
+                                                        child: const Texts(
+                                                          texts: 'Apply Coupon',
+                                                          fontSize: 18,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: Colors.white,
+                                                        ),
+                                                      )
+                                                    : Container()
                                               ],
                                             ),
                                           ),

@@ -9,6 +9,8 @@ import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_
 import 'package:pop_and_pose/src/feature/screen/camera/presentation/bloc/camera_state.dart';
 import 'package:pop_and_pose/src/feature/screen/choose_frame/page/choose_frame.dart';
 import 'package:pop_and_pose/src/feature/screen/register_device/page/register_device.dart';
+import 'package:pop_and_pose/src/feature/screen/select_photo/page/select_photos.dart';
+import 'package:pop_and_pose/src/feature/screen/testScreen/testScreen.dart';
 import 'package:pop_and_pose/src/feature/widgets/app_texts.dart';
 import 'package:pop_and_pose/src/feature/widgets/containers.dart';
 import 'dart:convert';
@@ -37,6 +39,7 @@ class _SplashScreenPageState extends State<SplashScreenPage>
   @override
   void initState() {
     super.initState();
+
     _getDeviceInfo();
     _animationController = AnimationController(
       vsync: this,
@@ -255,7 +258,7 @@ class _SplashScreenPageState extends State<SplashScreenPage>
         fit: StackFit.expand,
         children: [
           Image.asset(
-            'images/background.png',
+            'images/splas.png',
             fit: BoxFit.cover,
           ),
           SafeArea(
@@ -264,66 +267,65 @@ class _SplashScreenPageState extends State<SplashScreenPage>
                 // Determine layout based on screen size
                 final bool isLargeScreen = constraints.maxWidth > 800;
 
-                return Center(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(height: isLargeScreen ? 40 : 20),
-                        Containers(
-                          height: isLargeScreen ? 200 : 140,
-                          width: isLargeScreen ? 200 : 140,
-                          child: Image.asset(
-                            'images/Logo.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        SizedBox(height: isLargeScreen ? 40 : 20),
-                        Texts(
-                          texts: 'Pop And Pose',
-                          fontSize: isLargeScreen ? 80 : 60,
-                          color: const Color.fromRGBO(21, 20, 38, 1),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        const SizedBox(height: 10),
-                        BlocConsumer<CameraBloc, CameraState>(
-                          listener: (context, state) {
-                            if (state is CameraError) {
-                              _dismissLoadingDialog();
-                              ToasterService.error(message: state.message);
-                            } else if (state is CameraConnectedState) {
-                              _dismissLoadingDialog();
-                              _submitWithoutUser();
-                            } else if (state is CameraDiscoveringState) {
-                              _showLoadingDialog(context);
-                            } else if (state is CameraDisconnectedState) {
-                              _dismissLoadingDialog();
-                            }
-                          },
-                          builder: (context, state) {
-                            return _buildStatusUI(state);
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        Containers(
-                          width: isLargeScreen ? 120 : 92,
-                          height: isLargeScreen ? 120 : 92,
-                          child: Image.asset(
-                            'images/icon.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        const SizedBox(height: 60),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 25),
-                          child: CircularProgressIndicatorContainer(
-                            progressValue: 0.05,
-                            horizontal: 120,
-                          ),
-                        ),
-                      ],
-                    ),
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      //  SizedBox(height: isLargeScreen ? 40 : 20),
+                      // Containers(
+                      //   height: isLargeScreen ? 200 : 140,
+                      //   width: isLargeScreen ? 200 : 140,
+                      //   child: Image.asset(
+                      //     'images/Logo.png',
+                      //     fit: BoxFit.contain,
+                      //   ),
+                      // ),
+                      //  SizedBox(height: isLargeScreen ? 40 : 20),
+                      // Texts(
+                      //   texts: 'Pop And Pose',
+                      //   fontSize: isLargeScreen ? 80 : 60,
+                      //   color: const Color.fromRGBO(21, 20, 38, 1),
+                      //   fontWeight: FontWeight.w600,
+                      // ),
+                      // const SizedBox(height: 10),
+                      BlocConsumer<CameraBloc, CameraState>(
+                        listener: (context, state) {
+                          if (state is CameraError) {
+                            _dismissLoadingDialog();
+                            ToasterService.error(message: state.message);
+                          } else if (state is CameraConnectedState) {
+                            _dismissLoadingDialog();
+                            _submitWithoutUser();
+                          } else if (state is CameraDiscoveringState) {
+                            _showLoadingDialog(context);
+                          } else if (state is CameraDisconnectedState) {
+                            _dismissLoadingDialog();
+                          }
+                        },
+                        builder: (context, state) {
+                          return Positioned.fill(
+                              bottom: 100, child: _buildStatusUI(state));
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      // Containers(
+                      //   width: isLargeScreen ? 120 : 92,
+                      //   height: isLargeScreen ? 120 : 92,
+                      //   child: Image.asset(
+                      //     'images/icon.png',
+                      //     fit: BoxFit.contain,
+                      //   ),
+                      // ),
+                      // const SizedBox(height: 60),
+                      // const Padding(
+                      //   padding: EdgeInsets.symmetric(vertical: 25),
+                      //   child: CircularProgressIndicatorContainer(
+                      //     progressValue: 0.05,
+                      //     horizontal: 120,
+                      //   ),
+                      // ),
+                    ],
                   ),
                 );
               },
@@ -361,23 +363,27 @@ class _SplashScreenPageState extends State<SplashScreenPage>
       return GestureDetector(
         onTap: () async {
           bool exists = await checkDeviceExists();
+
           if (exists) {
             context.read<CameraBloc>().add(DiscoverCameraEvent());
           } else {
             Get.offAll(() => const RegisterDevice());
           }
 
-          //   context.read<CameraBloc>().add(DiscoverCameraEvent());
-
-          //Get.offAll(() => const RegisterDevice());
+          // context.read<CameraBloc>().add(DiscoverCameraEvent());
 
           //  Get.offAll(() =>  const SettingsPage());
         },
-        child: const Texts(
-          texts: 'Touch the screen to START',
-          fontSize: 45,
-          fontWeight: FontWeight.w400,
-          color: Color.fromRGBO(55, 65, 81, 1),
+        child: Container(
+          width: 150,
+          height: 50,
+          color: Colors.white,
+          child: const Texts(
+            texts: 'START',
+            fontSize: 45,
+            fontWeight: FontWeight.w400,
+            color: Color.fromRGBO(55, 65, 81, 1),
+          ),
         ),
       );
     }

@@ -126,7 +126,7 @@ class CameraApi {
   List<String> _extractThumbnailUrls(List<dynamic> urls, int noOfPhotos) {
     return urls
         .map((url) =>
-            url.contains('?') ? '$url&kind=thumbnail' : '$url?kind=thumbnail')
+            url.contains('?') ? '$url&kind=display' : '$url?kind=display')
         .toList()
         .reversed
         .take(noOfPhotos)

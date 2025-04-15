@@ -8,7 +8,7 @@ class Getdeviceinformation {
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     //IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
     AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-
+    print('ttt${androidInfo.model},${androidInfo.device}');
     return [androidInfo.model, androidInfo.device];
   }
 

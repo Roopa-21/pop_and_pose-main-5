@@ -51,6 +51,8 @@ class _PhotoSelectorState extends State<PhotoSelector> {
   double horizontalGap = 10.0;
   double verticalGap = 10.0;
   String imageShape = 'circle';
+  double bottomPadding = 10.0;
+  double topPadding = 10.0;
   Map<int, double> _rotationAngles = {};
   Map<int, double> _scales = {};
   // Handle image selection and store actual byte data
@@ -72,10 +74,15 @@ class _PhotoSelectorState extends State<PhotoSelector> {
   // }
   void _handleImageSelection(Uint8List image, int index) {
     setState(() {
-      if (selectedImages.containsKey(index)) {
-        selectedImages.remove(index);
-      } else {
-        selectedImages[index] = image;
+      if (selectedImages.containsValue(image)) {
+        selectedImages.removeWhere((key, value) => value == image);
+      } else if (selectedImages.length < widget.noOfPhotos! / 2) {
+        for (int i = 1; i <= widget.noOfPhotos!; i++) {
+          if (!selectedImages.containsKey(i)) {
+            selectedImages[i] = image;
+            break;
+          }
+        }
       }
     });
   }
@@ -102,6 +109,8 @@ class _PhotoSelectorState extends State<PhotoSelector> {
           horizontalGap = (frameSelection['horizontal_gap'] ?? 10).toDouble();
           verticalGap = (frameSelection['vertical_gap'] ?? 10).toDouble();
           imageShape = frameSelection['shapes'] ?? 'circle';
+          topPadding = (frameSelection['topPadding'] ?? 10).toDouble();
+          bottomPadding = (frameSelection['bottomPadding'] ?? 10).toDouble();
         });
       } else {
         print('Failed to load user data. Status Code: ${response.statusCode}');
@@ -206,7 +215,7 @@ class _PhotoSelectorState extends State<PhotoSelector> {
   @override
   void initState() {
     super.initState();
-    print('rr${widget.imageInfo}');
+
     startTimer();
     _getDeviceInfo();
 
@@ -229,6 +238,11 @@ class _PhotoSelectorState extends State<PhotoSelector> {
   // Upload selected images to backend
   Future<void> uploadImage() async {
     if (selectedImages.length < widget.noOfPhotos! / 2) {
+      Get.snackbar('Error',
+          'Please select ${widget.noOfPhotos! / 2} images before uploading.');
+      return;
+    }
+    if (selectedImages.length > widget.noOfPhotos! / 2) {
       Get.snackbar('Error',
           'Please select ${widget.noOfPhotos! / 2} images before uploading.');
       return;
@@ -410,16 +424,10 @@ class _PhotoSelectorState extends State<PhotoSelector> {
 
                                                         return GestureDetector(
                                                           onTap: () {
-                                                            if (selectedImages
-                                                                        .length <
-                                                                    (widget.noOfPhotos!) ||
-                                                                selectedImages
-                                                                    .containsValue(
-                                                                        imagePath))
-                                                              _handleImageSelection(
-                                                                  imagePath
-                                                                      as Uint8List,
-                                                                  index);
+                                                            _handleImageSelection(
+                                                                imagePath
+                                                                    as Uint8List,
+                                                                index);
                                                           },
                                                           child: Container(
                                                             decoration:
@@ -593,38 +601,66 @@ class _PhotoSelectorState extends State<PhotoSelector> {
   Widget getContainerWidget() {
     return selectedImages.isEmpty
         ? const Center(child: Text("No images selected"))
-        : Container(
-            height: 480,
+        :
+        // LayoutBuilder(builder: (context, constraints) {
+        // double itemWidth =
+        //     (constraints.maxWidth - ((columns - 1) * horizontalGap)) /
+        //         columns;
+        // double itemHeight = (constraints.maxHeight -
+        //         ((rows - 1) * (topPadding + bottomPadding))) /
+        //     rows;
+        // print('jj$itemHeight');
+        // print('oo$itemWidth');
+        // double aspectRatio = itemWidth / itemHeight;
+        // print('mm$aspectRatio');
+        Container(
+            height: 576,
+            width: 384,
             color: AppColor.kAppColorGrey,
-            child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.symmetric(
-                  vertical: verticalGap, horizontal: horizontalGap),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                crossAxisSpacing: horizontalGap,
-                mainAxisSpacing: verticalGap,
-                childAspectRatio: 1,
-              ),
-              itemCount: selectedImages.length,
-              itemBuilder: (context, index) {
-                int imageKey = selectedImages.keys.elementAt(index);
-                Uint8List imageBytes = selectedImages[imageKey]!;
+            child: LayoutBuilder(builder: (context, constraints) {
+              double itemWidth =
+                  (constraints.maxWidth - ((columns - 1) * horizontalGap)) /
+                      columns;
+              double itemHeight = (constraints.maxHeight -
+                      ((rows - 1) * (topPadding + bottomPadding))) /
+                  rows;
+              print('height$itemHeight');
+              print('width$itemWidth');
+              double aspectRatio = itemWidth / itemHeight;
+              print('aspect$aspectRatio');
+              return GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.only(
+                    bottom: bottomPadding,
+                    top: topPadding,
+                    left: horizontalGap,
+                    right: horizontalGap),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: horizontalGap,
+                  mainAxisSpacing: verticalGap, //cut horizontal
+                  childAspectRatio: aspectRatio,
+                ),
+                itemCount: selectedImages.length,
+                itemBuilder: (context, index) {
+                  int imageKey = selectedImages.keys.elementAt(index);
+                  Uint8List imageBytes = selectedImages[imageKey]!;
 
-                return GestureDetector(
-                  onScaleUpdate: (details) {
-                    setState(() {
-                      _scales[imageKey] = details.scale.clamp(0.5, 3.0);
-                      _rotationAngles[imageKey] = details.rotation;
-                    });
-                  },
-                  child: buildImageShape(imageShape, imageBytes, imageKey),
-                );
-                // final imageBytes = selectedImages.values.elementAt(index);
-                // return buildImageShape(imageShape, imageBytes);
-              },
-            ),
-          );
+                  return GestureDetector(
+                    onScaleUpdate: (details) {
+                      setState(() {
+                        _scales[imageKey] = details.scale.clamp(0.5, 3.0);
+                        _rotationAngles[imageKey] = details.rotation;
+                      });
+                    },
+                    child: buildImageShape(imageShape, imageBytes, imageKey),
+                  );
+                  // final imageBytes = selectedImages.values.elementAt(index);
+                  // return buildImageShape(imageShape, imageBytes);
+                },
+              );
+            }));
+    //   });
   }
 }
 
